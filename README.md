@@ -1,0 +1,1 @@
+# openpool-plugin
