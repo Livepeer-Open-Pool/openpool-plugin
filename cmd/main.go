@@ -11,7 +11,7 @@ import (
 )
 
 // loadStoragePlugin loads the storage plugin and returns a StorageInterface.
-func loadStoragePlugin(cfg *config.Config, pluginDir, storagePluginName string) pool.StorageInterface {
+func loadStoragePlugin(cfg *config.Config, pluginDir, storagePluginName string) (pool.StorageInterface, error) {
 	if storagePluginName == "" {
 		log.Fatal("Storage plugin name is not provided in the configuration.")
 	}
@@ -33,7 +33,7 @@ func loadStoragePlugin(cfg *config.Config, pluginDir, storagePluginName string) 
 	}
 
 	storage.Init(cfg)
-	return storage
+	return storage, nil
 }
 
 // loadGenericPlugin loads a plugin and returns an initialized PluginInterface.
@@ -58,9 +58,7 @@ func loadGenericPlugin(path string, cfg *config.Config, storage pool.StorageInte
 }
 
 func Run(configFileName string) {
-	//configFileName := flag.String("config", "/etc/pool/config.json", "Open Pool Configuration file to use")
-	//flag.Parse()
-	fmt.Printf("Using config file: %s\n", configFileName)
+	log.Printf("Starting Run with config file: %s\n", configFileName)
 
 	// Load configuration from JSON file
 	cfg, err := config.LoadConfig(configFileName)
@@ -76,20 +74,26 @@ func Run(configFileName string) {
 
 	// Load the storage plugin first
 	fmt.Println("Loading storage plugin...")
-	storage := loadStoragePlugin(cfg, pluginDir, cfg.StoragePluginName)
+	storage, err := loadStoragePlugin(cfg, pluginDir, cfg.StoragePluginName)
+	if err != nil {
+		log.Fatal("Failed to create storage plugin")
+	}
 
 	// Collect plugins dynamically from the config
 	var pluginPaths []string
 
 	if cfg.APIConfig != nil && cfg.APIConfig.PluginName != "" {
+		log.Println("Loading Plugin from APIConfig")
 		pluginPaths = append(pluginPaths, filepath.Join(pluginDir, cfg.APIConfig.PluginName))
 	}
 
 	if cfg.PayoutLoopConfig != nil && cfg.PayoutLoopConfig.PluginName != "" {
+		log.Println("Loading Plugin from PayoutLoopConfig")
 		pluginPaths = append(pluginPaths, filepath.Join(pluginDir, cfg.PayoutLoopConfig.PluginName))
 	}
 
 	if cfg.DataLoaderPluginConfig != nil && cfg.DataLoaderPluginConfig.PluginName != "" {
+		log.Println("Loading Plugin from DataLoaderPluginConfig")
 		pluginPaths = append(pluginPaths, filepath.Join(pluginDir, cfg.DataLoaderPluginConfig.PluginName))
 	}
 
@@ -98,12 +102,16 @@ func Run(configFileName string) {
 		instance := loadGenericPlugin(path, cfg, storage)
 		instances = append(instances, instance)
 	}
+	log.Println("Plugins loaded successfully")
 
 	// Start all plugins concurrently
-	for _, p := range instances {
-		go p.Start()
+	for idx, p := range instances {
+		go func() {
+			log.Println("Starting Plugin ", idx)
+			p.Start()
+		}()
 	}
+	log.Println("Plugins started successfully")
 
-	fmt.Println("All plugins started.")
 	select {} // Block forever
 }
