@@ -18,7 +18,7 @@ type StorageInterface interface {
 	GetLastEventTimestamp() (time.Time, error)
 	AddEvent(event models.PoolEvent) error
 	GetWorkers() ([]models.Worker, error)
-	GetFilteredWorkers() ([]models.Worker, error)
+	GetPreferredWorkers(criteria models.PreferredWorkerCriteria) ([]models.Worker, error)
 	AddPaidFees(ethAddress string, amount int64, txhash string, region string, nodeType string) error //wei values
 	UpdateWorkerStatus(ethAddress string, online bool, region string, nodeType string) error
 	AddPendingFees(ethAddress string, amount int64, region string, nodeType string) error //wei values
